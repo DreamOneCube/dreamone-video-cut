@@ -1,6 +1,6 @@
 # 夢想一號影片剪輯 Skill 交付驗證
 
-來源：Claude 對話「大師不藏私剪輯」的 dreamone-video-cut.zip。原包保留在本機，本次整理到 dreamone-skills 的 skills/dreamone-video-cut。
+來源：Claude 對話「大師不藏私剪輯」的 dreamone-video-cut.zip。原包保留在本機，本次整理到 dreamone-video-cut 的 skills/dreamone-video-cut。
 
 ## 內容
 

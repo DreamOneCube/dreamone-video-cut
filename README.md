@@ -1,4 +1,4 @@
-# dreamone-skills
+# dreamone-video-cut
 
 夢想一號的 AI 工具與可重複使用的 Skill。新增工具透過分支與 Pull Request 審閱。
 
