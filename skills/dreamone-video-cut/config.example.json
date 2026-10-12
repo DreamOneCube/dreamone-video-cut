@@ -1,0 +1,19 @@
+{
+  "output_name": "教學影片",
+  "title": "",
+  "logo": "assets/logo_horizontal_white.png",
+  "font": "assets/jf-openhuninn-1.1.ttf",
+  "chapters": [
+    "開場介紹",
+    "核心內容",
+    "示範與總結"
+  ],
+  "layout": {
+    "top_strip": true,
+    "cc_band": true
+  },
+  "terms": [
+    "terms/common.json"
+  ],
+  "chunk_seconds": 55
+}
