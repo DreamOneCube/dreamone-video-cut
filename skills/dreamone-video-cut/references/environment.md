@@ -51,3 +51,13 @@ Codex 本機可直接執行 build 與 run；逾時、下載權限、ffmpeg 版�
 
 - 先給**一張示意圖＋5 秒試剪**再全跑。版面在這一步改最便宜——全片編碼要 1–2 小時。
 - 版面每改一次，舊的 `.done` 不能沿用（疊圖變了），要開新的 plan 資料夾。
+
+## 短影片踩過的坑（2026-10）
+
+- **iPhone 直拍帶 rotation=90**：用 `-filter_complex` 時 ffmpeg 7 會把 display matrix 帶到輸出，播放器再轉一次變橫躺。濾鏡鏈最後加 `sidedata=mode=delete:type=DISPLAYMATRIX`，輸出後用 ffprobe 確認。
+- **OpenCC s2twp 會把「項目」改成「專案」、「台灣」改成「臺灣」**：在詞彙表改回（`terms/events.json`）。
+- **SenseVoice 的字時間比實際聲音早約 0.1–0.2 秒**：剪單字時搜尋範圍往後偏；剪完一定要重新辨識驗證。
+- **只辨識一小段空檔容易出現幻覺字**（例：「喂」），要連同下一段開頭一起辨識再比對。
+- **「那」這類發語詞音量很小、和背景噪音差不多**，靠音量找不到邊界；用「試剪＋重新辨識」決定剪點。
+- **jieba 詞典是簡體**：繁體文字先用 OpenCC `t2s` 轉成簡體再斷詞，否則會被拆成單字。
+- 沒有 Homebrew 的 Apple Silicon Mac：ffmpeg 可用 ffmpeg.org 下載頁連到的 osxexperts 靜態版（含 libass，能燒字幕）。

@@ -24,3 +24,7 @@ cp package/jf-openhuninn-1.1.ttf assets/
 - 換別的品牌或活動影片時，換一個透明背景、淺色字的 PNG 即可
 
 內附 `logo_horizontal_white.png` 的來源為夢想一號工作區既有品牌素材原檔，未重新繪製。粉圓體檔案的 Git blob SHA 為 `3b697a71aa192e9bbf73fd7662f157b0451c316e`，與官方 `font/jf-openhuninn-1.1.ttf` 一致。
+
+## Logo：三角形（短影片用）
+
+`logo_triangle.png` 從「夢想一號魔術方塊學院」直式 Logo 裁出三角形、去掉下方文字，白底改成透明。短影片放右上角（寬 170px）。
