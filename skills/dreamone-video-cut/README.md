@@ -12,11 +12,18 @@ scripts/subtitles.py        辨識稿清理：簡轉繁、詞彙表、去語助�
 scripts/build.py            規劃：版面 PNG、編碼單元表、SRT/TXT（雲端）
 scripts/measure_gain.py     量每支素材音量、算增益（Mac）
 scripts/run.py              分段編碼、串接、截圖檢查表（Mac）
+scripts/short_video.py      短影片：單行燒入字幕、重點詞上色放大、資訊卡、B-roll、三角形 Logo
+scripts/cleanup.py          短影片：剪過長停頓與句首發語詞（剪後重新辨識驗證）
+scripts/cards.py            短影片的資訊卡、B-roll 標籤圖
+short.example.json          短影片設定範例（重點詞、字卡、B-roll）
+terms/events.json           賽事類短影片常見錯聽（魔錶、Square-1、盲解、身分證…）
 terms/common.json           系列共用詞彙（大師不藏私、魔術方塊、夢想一號）
 terms/skewb.json            斜轉專用詞彙（範例；新主題照格式新增一個檔）
 references/environment.md   環境限制與實際踩過的坑
 assets/README.md            字型與 Logo 的取得方式
 ```
+
+短影片流程（SKILL.md 第 10 節）首次用於 2026 年 10 月的 WCA 20 週年趣味賽介紹。
 
 第一個用這套流程剪出的成品：《大師不藏私》斜轉進階 第一部（50:43）、第二部（13:56），2026 年 9 月。
 
