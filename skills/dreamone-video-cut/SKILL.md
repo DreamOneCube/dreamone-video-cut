@@ -152,6 +152,7 @@ python3 scripts/asr.py --models <模型資料夾> work/audio/*.wav             #
 
 - **剪掉過長停頓**：辨識段落間空檔 > 0.6 秒就剪，前後各留 0.15 秒（`cleanup.py pauses`）。空檔會連同下一段開頭重新辨識，VAD 漏掉的字（例如「**以**上的活動」的「以」）會保留並補回字幕。
 - **剪掉發語詞**：句首的「那」（不含那個／那些／那麼）與單獨的「好，」，聲音和字幕一起拿掉（`cleanup.py fillers`）。每個都試多組剪點、剪完重新辨識，前後字完整且沒殘音才採用。**真的剪不乾淨的就留著，字幕也保留**，不要硬剪。
+- **剪掉重講**：同一句話連講兩次（「精確到秒的精確到秒的」「國籍的話國籍的話」）剪掉前一次（`cleanup.py repeats`，自動偵測；中間有句號／逗號隔開的不算）。說法略不同的重講或結巴（「我們就複製隔壁頁面的，我們就複製隔壁的」「要要求」）寫在 `short.json` 的 `repeats`：`{"ctx": 含重講的整段, "cut": 要剪掉的開頭}`，`cut` 必須是 `ctx` 的開頭。「一個一個」「非常非常」是強調，不剪。
 - **字幕只有一行**：每句最多 15 字，太長就拆成下一句；用 jieba 斷詞，不切在詞中間，下一句不用助詞開頭。粉圓體 58px、白字黑邊。
 - **重點詞上色＋放大**：Claude 自己判斷重點（活動名、條件、數字、行動呼籲），黃色 `&H0000D4FF&`，講到時放大到 130% 再回 110%。寫在 `highlights`。
 - **右上角三角形 Logo**（`assets/logo_triangle.png`，只有三角形、不含學院文字），寬 170px、離邊 50px。
@@ -168,6 +169,7 @@ ffmpeg -i <影片> -vn -ac 1 -ar 16000 -c:a pcm_s16le work/<name>.wav
 python3 scripts/asr.py --models <模型> work/<name>.wav
 python3 scripts/cleanup.py --dir <專案> --models <模型> pauses
 python3 scripts/cleanup.py --dir <專案> --models <模型> fillers
+python3 scripts/cleanup.py --dir <專案> --models <模型> repeats
 python3 scripts/short_video.py --dir <專案> make          # 產生 SRT／TXT，先讀過、決定重點詞與字卡
 python3 scripts/short_video.py --dir <專案> burn --ss 28 --t 16 --out work/test.mp4   # 試看
 python3 scripts/short_video.py --dir <專案> burn          # 全片
@@ -182,3 +184,28 @@ ffmpeg 不在 PATH 時用環境變數 `FFMPEG`、`FFPROBE` 指定。
 3. `ffprobe` 確認輸出**沒有 rotation 標記**、解析度和原片一樣。
 
 回報時列出：剪了哪些停頓與發語詞、保留了哪些剪不乾淨的、重點詞清單、每張字卡內容，並附 TXT 讓使用者勘誤（改完重新 `make` → `burn`）。
+
+## 11. 橫式「實況」教學影片（人像＋螢幕錄影）
+
+講者直拍人像＋另外錄的螢幕操作（例：報名流程教學），做成 1920×1080 橫式。第 10 節的剪輯與字幕規則照用（剪停頓、發語詞、重講，單行燒入字幕、重點詞上色），差別如下：
+
+- **版面**：純講解時人像置中、兩側墊模糊放大的人像；講到操作時切成「實況」版面——深色底、**人像小視窗在左上角**（黃框）、螢幕錄影放右側 1600×950、下方留給字幕，Logo 移到左欄。
+- **螢幕錄影要配合講解**：先每 3 秒抽一格做附時間的縮圖表，找出每個動作（點按鈕、貼上、跳頁）在錄影的秒數，再逐段對到講解。講解比操作長就放慢、短就加速（例：「填一填」2 倍速）。示範段裡的停頓**不剪**（那是操作畫面）。
+- 錄影裁掉 macOS 選單列與 Dock；講到時間／時鐘時可以放大右上角時鐘。
+- 錄影裡看得到本名、Email、生日時，回報時要提醒使用者決定是否打馬賽克。
+
+### 人聲修復（爆音、吵雜）
+
+```
+highpass=f=80, adeclip, arnndn=m=std.rnnn:mix=0.9,
+acompressor=threshold=-20dB:ratio=2.5:attack=8:release=200,
+loudnorm（兩段式：先量測、再 linear=true，-16 LUFS / TP -1.5）
+```
+
+- `adeclip` 修削波（爆音）；`afftdn` 對鍵盤、滑鼠這類非穩態噪音幾乎沒用，改用 RNNoise（`arnndn`，模型 `std.rnnn` 來自 GitHub richardpl/arnndn-models；`bd.rnnn` 會把人聲一起壓小）。
+- **不要用單段 loudnorm**：它會把安靜處（噪音）一起拉大。
+- 驗證：量「講話中位音量 − 安靜處 5% 音量」要變大、削波樣本比例為 0；再把處理後的聲音重新辨識，和原始稿相似度應 ≥ 0.97（確認沒有把字壓糊）。
+
+### 幀數
+
+手機直拍常是 14–17fps 的變動幀率。`minterpolate` 補到 60fps 約 4–5 倍片長的時間（6 分鐘片要 30 分鐘以上），初稿先輸出 30fps，定稿再決定要不要補。
