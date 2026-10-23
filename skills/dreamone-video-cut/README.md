@@ -15,6 +15,9 @@ scripts/run.py              分段編碼、串接、截圖檢查表（Mac）
 scripts/short_video.py      短影片：單行燒入字幕、重點詞上色放大、資訊卡、B-roll、三角形 Logo
 scripts/cleanup.py          短影片：剪過長停頓與句首發語詞（剪後重新辨識驗證）
 scripts/cards.py            短影片的資訊卡、B-roll 標籤圖
+scripts/styled_short.py     綜藝字幕風格短影音：金萱字型、黃色強調大字、標題列、緊湊剪輯、資訊圖卡片、加速
+scripts/voice_clean.py      人聲修復：去爆音、RNNoise 或背景音樂模式、補高頻、兩段式響度
+styled.example.json         綜藝字幕風格的設定範例
 short.example.json          短影片設定範例（重點詞、字卡、B-roll）
 terms/events.json           賽事類短影片常見錯聽（魔錶、Square-1、盲解、身分證…）
 terms/common.json           系列共用詞彙（大師不藏私、魔術方塊、夢想一號）
