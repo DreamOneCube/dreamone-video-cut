@@ -24,17 +24,30 @@ SUB_FONT, EMPH_FONT = "jf-jinxuanlatte-2.0 ExtraBold", "jf-jinxuanlatte-2.0 Heav
 HEAVY_FILE = "JF-JINXUANLATTE-2.0-HEAVY.OTF"
 YELLOW = "&H2AE9F2&"                     # ASS 是 BGR：#F2E92A
 W, H, FPS = 1080, 1920, 30
+# IG Reels 安全範圍（1080×1920）：上方有 Reels 標題／相機鍵、下方 25% 是帳號名稱與說明文字、
+# 右側約 120px 是愛心／留言／分享按鈕。標題、Logo、字幕、字卡都要放在這個範圍內。
+IG_SAFE = {"top": 250, "bottom": 480, "left": 60, "right": 140}
+SUB_SIZE, EMPH_SIZE = 84, 110
+TITLE_H = 59
 
 
 def load(d):
     c = json.load(open(os.path.join(d, "styled.json"), encoding="utf-8"))
     c.setdefault("speed", 1.0)
-    c.setdefault("title_y", 140)
-    c.setdefault("sub_y", 1150)
-    c.setdefault("card_w", 900)
-    c.setdefault("card_bottom", 30)
+    c["safe"] = {**IG_SAFE, **c.get("safe", {})}
+    s = c["safe"]
+    c["safe_w"] = W - s["left"] - s["right"]
+    c["safe_cx"] = s["left"] + c["safe_w"] // 2
+    c.setdefault("title_y", s["top"])
+    c.setdefault("card_w", c["safe_w"])
+    c.setdefault("card_bottom", s["bottom"])
     c.setdefault("fonts_dir", os.path.expanduser("~/Library/Fonts"))
     c["fonts_dir"] = os.path.expanduser(c["fonts_dir"])
+    if "sub_y" not in c:                 # 字幕貼在最高那張字卡上方；沒有字卡就放安全範圍底部
+        from PIL import Image
+        hs = [Image.open(os.path.join(d, p)).size for p, _, _ in c.get("cards", [])]
+        top = H - s["bottom"] - max([h * c["card_w"] / w for w, h in hs], default=0)
+        c["sub_y"] = int(top - 60)
     return c
 
 
@@ -112,17 +125,33 @@ def ts(t):
     return f"{cs // 360000}:{cs // 6000 % 60:02d}:{cs // 100 % 60:02d}.{cs % 100:02d}"
 
 
-def line(text, emph, dur_ms):
-    """強調字換金萱 Heavy、放大、黃色、陰影，講到時彈一下（可以有好幾個）。"""
+def fit(c, text, emph):
+    """整行（強調字以彈完後的 108% 計）超過安全範圍寬度就整行縮小。"""
+    from PIL import ImageFont
+    fd = c["fonts_dir"]
+    fs = ImageFont.truetype(os.path.join(fd, "JF-JINXUANLATTE-2.0-EXTRABOLD.OTF"), SUB_SIZE)
+    fe = ImageFont.truetype(os.path.join(fd, HEAVY_FILE), EMPH_SIZE)
+    width, rest = 0.0, text
+    for word in emph:
+        if word in rest:
+            width += fe.getlength(word) * 1.08
+            rest = rest.replace(word, "", 1)
+    width += fs.getlength(rest) + 16          # 黑邊
+    return min(1.0, (c["safe_w"] - 20) / width)
+
+
+def line(text, emph, dur_ms, k=1.0):
+    """強調字換金萱 Heavy、放大、黃色、陰影，講到時彈一下（可以有好幾個）。k：整行縮放。"""
     for word in sorted(emph, key=text.find, reverse=True):
         i = text.find(word)
         if i < 0:
             continue
         o = max(0, int(dur_ms * i / len(text)) - 60)
         tag = (f"{{\\fn{EMPH_FONT}\\c{YELLOW}\\bord4\\3c&H1A1A1A&\\shad7\\4c&H000000&\\4a&H40&"
-               f"\\fscx100\\fscy100\\t({o},{o + 120},\\fscx122\\fscy122)\\t({o + 120},{o + 260},\\fscx108\\fscy108)\\fs110}}")
-        text = text[:i] + tag + word + "{\\r}" + text[i + len(word):]
-    return text
+               f"\\fscx100\\fscy100\\t({o},{o + 120},\\fscx122\\fscy122)\\t({o + 120},{o + 260},\\fscx108\\fscy108)"
+               f"\\fs{round(EMPH_SIZE * k)}}}")
+        text = text[:i] + tag + word + f"{{\\r\\fs{round(SUB_SIZE * k)}}}" + text[i + len(word):]
+    return (f"{{\\fs{round(SUB_SIZE * k)}}}" if k < 1 else "") + text
 
 
 def write_ass(c, d, remap, path):
@@ -130,11 +159,11 @@ def write_ass(c, d, remap, path):
         f.write(f"[Script Info]\nScriptType: v4.00+\nPlayResX: {W}\nPlayResY: {H}\nWrapStyle: 2\n\n"
                 "[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, "
                 "Bold, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV\n"
-                f"Style: Default,{SUB_FONT},84,&H00FFFFFF,&H00141414,&H80000000,0,1,8,4,5,30,30,0\n\n"
+                f"Style: Default,{SUB_FONT},{SUB_SIZE},&H00FFFFFF,&H00141414,&H80000000,0,1,8,4,5,30,30,0\n\n"
                 "[Events]\nFormat: Layer, Start, End, Style, Text\n")
         for a, b, text, emph in c["cues"]:
             s, e = remap(a), remap(b)
-            f.write(f"Dialogue: 0,{ts(s)},{ts(e)},Default,{{\\pos({W // 2},{c['sub_y']})}}{line(text, emph, int((e - s) * 1000))}\n")
+            f.write(f"Dialogue: 0,{ts(s)},{ts(e)},Default,{{\\pos({c['safe_cx']},{c['sub_y']})}}{line(text, emph, int((e - s) * 1000), fit(c, text, emph))}\n")
     with open(os.path.join(d, f"{c['out_name']}_字幕.txt"), "w", encoding="utf-8") as f:
         f.write("\n".join(t for _, _, t, _ in c["cues"]) + "\n")
 
@@ -145,14 +174,14 @@ def title_png(c, path):
     S, size = 2, 82
     while True:
         font = ImageFont.truetype(os.path.join(c["fonts_dir"], HEAVY_FILE), size * S)
-        if sum(font.getlength(t) for t, _ in c["title"]) <= (W - 80) * S or size <= 50:
+        if sum(font.getlength(t) for t, _ in c["title"]) <= (c["safe_w"] - 40) * S or size <= 50:
             break
         size -= 2
     bh = 118 * S
     im = Image.new("RGBA", (W * S, bh), (20, 22, 26, 170))
     txt = Image.new("RGBA", (W * S, bh), (0, 0, 0, 0))
     dr = ImageDraw.Draw(txt)
-    x = (W * S - sum(font.getlength(t) for t, _ in c["title"])) / 2
+    x = c["safe_cx"] * S - sum(font.getlength(t) for t, _ in c["title"]) / 2
     for t, col in c["title"]:
         fill = (255, 255, 255, 255) if col == "white" else (242, 233, 42, 255)
         dr.text((x + 5 * S, bh / 2 + 6 * S), t, font=font, fill=(0, 0, 0, 160), anchor="lm")
@@ -185,7 +214,7 @@ def burn(d, models, ss, dur, out):
         inputs += ["-loop", "1", "-framerate", str(FPS), "-t", f"{E - S:.3f}", "-i", os.path.join(d, png)]
         y = f"H-h-{c['card_bottom']}" + ("" if prev_join else f"+max(0\\,{S}+0.25-t)*240")
         g += [f"[{n}:v]scale={c['card_w']}:-1,format=rgba,setpts=PTS-STARTPTS+{S}/TB,{fx}null[cc{k}]",
-              f"[{base}][cc{k}]overlay=x=(W-w)/2:y='{y}':eof_action=pass[cv{k}]"]
+              f"[{base}][cc{k}]overlay=x={c['safe_cx']}-w/2:y='{y}':eof_action=pass[cv{k}]"]
         base = f"cv{k}"
     if c.get("title"):
         title = os.path.join(d, "work", "title.png")
@@ -196,7 +225,7 @@ def burn(d, models, ss, dur, out):
         base = "tt"
     esc = lambda p: p.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
     sel = "+".join(f"between(t,{a},{b})" for a, b in keep)
-    g += [f"[2:v]scale=124:-1[logo]", f"[{base}][logo]overlay=W-w-36:22[lg]",
+    g += [f"[2:v]scale=110:-1[logo]", f"[{base}][logo]overlay={W - c['safe']['right']}-w:{c['title_y'] + TITLE_H + 14}[lg]",
           f"[lg]subtitles='{esc(ass)}':fontsdir='{esc(c['fonts_dir'])}',format=yuv420p,"
           f"sidedata=mode=delete:type=DISPLAYMATRIX,setpts=PTS/{speed}[v]",
           f"[1:a]aselect='{sel}',asetpts=N/SR/TB,atempo={speed}[a]"]
