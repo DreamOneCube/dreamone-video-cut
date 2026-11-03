@@ -253,7 +253,7 @@ def burn(d, models, ss, dur, out):
         m, L = c["bgm"], total / speed
         r = subprocess.run([FFMPEG, "-hide_banner", "-i", os.path.expanduser(m["file"]), "-af", "ebur128", "-f", "null", "-"],
                            capture_output=True, text=True)
-        gain = m.get("lufs", -30) - float(re.findall(r"I:\s+(-?[\d.]+) LUFS", r.stderr)[-1])   # 人聲 -16，音樂約低 14dB
+        gain = m.get("lufs", -25) - float(re.findall(r"I:\s+(-?[\d.]+) LUFS", r.stderr)[-1])   # 人聲 -16，音樂約低 9dB（使用者要大聲一點）
         n = inputs.count("-i")
         inputs += ["-stream_loop", "-1", "-i", os.path.expanduser(m["file"])]
         g += [f"[{n}:a]atrim=start={m.get('start', 0)}:duration={L:.3f},asetpts=PTS-STARTPTS,aformat=channel_layouts=mono,"
