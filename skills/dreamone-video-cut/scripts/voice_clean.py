@@ -49,6 +49,15 @@ def main():
               f"measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:offset={m['target_offset']}:linear=true")
         subprocess.run([FFMPEG, "-v", "error", "-y", "-i", a.src, "-vn", "-ac", "1", "-af", f"{pre},{ln},aresample=48000",
                         "-ar", "48000", "-c:a", "pcm_s16le", a.out], check=True)
+        # linear 模式遇到峰值太高會自動少拉，量一次，不夠就補增益＋限幅（A001_C015 只到 -20 LUFS）
+        r = subprocess.run([FFMPEG, "-hide_banner", "-i", a.out, "-af", "ebur128", "-f", "null", "-"], capture_output=True, text=True)
+        short = lufs - float(re.findall(r"I:\s+(-?[\d.]+) LUFS", r.stderr)[-1])
+        if short > 0.5:
+            tmp_out = os.path.join(tmp, "top.wav")
+            subprocess.run([FFMPEG, "-v", "error", "-y", "-i", a.out, "-af", f"volume={short:.1f}dB,alimiter=limit=0.84:level=false",
+                            "-ar", "48000", "-c:a", "pcm_s16le", tmp_out], check=True)
+            shutil.move(tmp_out, a.out)
+            print(f"補 {short:.1f} dB")
     print("->", a.out)
 
 

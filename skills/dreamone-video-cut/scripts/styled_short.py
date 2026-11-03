@@ -6,14 +6,16 @@
 - 強調字：金萱 Heavy、放大、黃色 #F2E92A、陰影，講到時彈一下（課程名稱、活動名稱等重要資訊）
 - 頂部標題列：深色半透明長條，金萱 Heavy 斜體，白字＋黃字
 - 資訊卡（例：從課程介紹圖裁出來的卡片）放在字幕下方、不擋臉，連續的卡直接換卡
-- 右上角三角形 Logo；整支可加速（字幕先燒再一起加速）
+- 三角形 Logo 放在標題列左端當徽章（不和字卡重疊）；整支可加速（字幕先燒再一起加速）
+- 全部資訊放在 IG Reels 安全範圍內（IG_SAFE）
+- 選用：beauty（磨皮＋氣色）、overlays（全畫面 B-roll 圖）、bgm（無版權背景音樂，講話時自動壓低）
 
     python styled_short.py --dir <專案> --models <辨識模型> [--ss 0 --t 10 --out test.mp4]
 
 專案資料夾放 styled.json（見 styled.example.json）；字幕內容與 take 選擇由 Claude 讀辨識稿後手寫進 cues。
 jf 金萱拿鐵是商用字型，不放進 repo，從 fonts_dir（預設 ~/Library/Fonts）讀取。
 """
-import argparse, glob, json, os, shutil, subprocess, sys
+import argparse, glob, json, os, re, shutil, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.dirname(HERE)
@@ -29,6 +31,12 @@ W, H, FPS = 1080, 1920, 30
 IG_SAFE = {"top": 250, "bottom": 480, "left": 60, "right": 140}
 SUB_SIZE, EMPH_SIZE = 84, 110
 TITLE_H = 59
+LOGO_W = 96                               # Logo 放在標題列左端當徽章，不和字卡、標題字重疊
+# 磨皮＋氣色：用膚色做遮罩，只在皮膚上做保邊模糊（眉毛、眼睛、頭髮不動），整體微提亮、偏暖紅
+SKIN_MASK = "format=rgba,colorkey=0xC89078:0.20:0.15,alphaextract,format=gray,negate,gblur=sigma=6"
+BEAUTY = ("split=3[bo][bs][bm];[bs]smartblur=lr=5:ls=1.0:lt=-30:cr=3:cs=0.6:ct=-20,format=rgba[bsb];"
+          f"[bm]{SKIN_MASK}[bmk];[bsb][bmk]alphamerge[bsk];[bo][bsk]overlay,"
+          "eq=brightness=0.015:saturation=1.10:gamma=1.04,colorbalance=rm=0.04:gm=-0.01:bm=-0.03:rh=0.01")
 
 
 def load(d):
@@ -174,14 +182,15 @@ def title_png(c, path):
     S, size = 2, 82
     while True:
         font = ImageFont.truetype(os.path.join(c["fonts_dir"], HEAVY_FILE), size * S)
-        if sum(font.getlength(t) for t, _ in c["title"]) <= (c["safe_w"] - 40) * S or size <= 50:
+        if sum(font.getlength(t) for t, _ in c["title"]) <= (c["safe_w"] - LOGO_W - 50) * S or size <= 50:
             break
         size -= 2
     bh = 118 * S
     im = Image.new("RGBA", (W * S, bh), (20, 22, 26, 170))
     txt = Image.new("RGBA", (W * S, bh), (0, 0, 0, 0))
     dr = ImageDraw.Draw(txt)
-    x = c["safe_cx"] * S - sum(font.getlength(t) for t, _ in c["title"]) / 2
+    lx = c["safe"]["left"] + LOGO_W + 24                  # 左端留給 Logo
+    x = (lx + W - c["safe"]["right"]) / 2 * S - sum(font.getlength(t) for t, _ in c["title"]) / 2
     for t, col in c["title"]:
         fill = (255, 255, 255, 255) if col == "white" else (242, 233, 42, 255)
         dr.text((x + 5 * S, bh / 2 + 6 * S), t, font=font, fill=(0, 0, 0, 160), anchor="lm")
@@ -205,6 +214,16 @@ def burn(d, models, ss, dur, out):
     inputs = ["-i", c["src"], "-i", os.path.join(d, c["audio"]), "-loop", "1", "-t", f"{raw + 5:.0f}", "-i", LOGO]
     g = [f"[0:v]select='{'+'.join(f'between(t,{a},{b})' for a, b in keep)}',setpts=N/FRAME_RATE/TB[b0]"]
     base, F, cards = "b0", 0.2, c.get("cards", [])
+    if c.get("beauty"):
+        g[-1] = g[-1][:-4] + "," + BEAUTY + "[b0]"
+    for k, (png, a, b) in enumerate(c.get("overlays", [])):     # 全畫面 B-roll（1080×1920 透明 png）
+        S, E = remap(a), remap(b)
+        n = inputs.count("-i")
+        inputs += ["-loop", "1", "-framerate", str(FPS), "-t", f"{E - S:.3f}", "-i", os.path.join(d, png)]
+        g += [f"[{n}:v]format=rgba,setpts=PTS-STARTPTS+{S}/TB,fade=in:st={S}:d=0.25:alpha=1,"
+              f"fade=out:st={E - 0.25}:d=0.25:alpha=1[ov{k}]",
+              f"[{base}][ov{k}]overlay=0:0:eof_action=pass[ob{k}]"]
+        base = f"ob{k}"
     for k, (png, a, b) in enumerate(cards):
         S, E = remap(a), remap(b)
         prev_join = k > 0 and abs(remap(cards[k - 1][2]) - S) < 0.05     # 剪輯後緊接：直接換卡
@@ -225,10 +244,23 @@ def burn(d, models, ss, dur, out):
         base = "tt"
     esc = lambda p: p.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
     sel = "+".join(f"between(t,{a},{b})" for a, b in keep)
-    g += [f"[2:v]scale=110:-1[logo]", f"[{base}][logo]overlay={W - c['safe']['right']}-w:{c['title_y'] + TITLE_H + 14}[lg]",
+    ly = f"{c['title_y'] + TITLE_H // 2}-h/2" if c.get("title") else str(c["title_y"])
+    g += [f"[2:v]scale={LOGO_W}:-1[logo]", f"[{base}][logo]overlay={c['safe']['left'] + 10}:{ly}[lg]",
           f"[lg]subtitles='{esc(ass)}':fontsdir='{esc(c['fonts_dir'])}',format=yuv420p,"
           f"sidedata=mode=delete:type=DISPLAYMATRIX,setpts=PTS/{speed}[v]",
-          f"[1:a]aselect='{sel}',asetpts=N/SR/TB,atempo={speed}[a]"]
+          f"[1:a]aselect='{sel}',asetpts=N/SR/TB,atempo={speed}" + ("[vo]" if c.get("bgm") else "[a]")]
+    if c.get("bgm"):                     # 背景音樂：循環到片長、降到人聲下方、講話時再自動壓低、頭尾淡入淡出
+        m, L = c["bgm"], total / speed
+        r = subprocess.run([FFMPEG, "-hide_banner", "-i", os.path.expanduser(m["file"]), "-af", "ebur128", "-f", "null", "-"],
+                           capture_output=True, text=True)
+        gain = m.get("lufs", -30) - float(re.findall(r"I:\s+(-?[\d.]+) LUFS", r.stderr)[-1])   # 人聲 -16，音樂約低 14dB
+        n = inputs.count("-i")
+        inputs += ["-stream_loop", "-1", "-i", os.path.expanduser(m["file"])]
+        g += [f"[{n}:a]atrim=start={m.get('start', 0)}:duration={L:.3f},asetpts=PTS-STARTPTS,aformat=channel_layouts=mono,"
+              f"aresample=48000,volume={gain:.1f}dB,afade=in:d=0.5,afade=out:st={L - 1.2:.3f}:d=1.2[bg]",
+              "[vo]aresample=48000,asplit[vo1][vo2]",
+              "[bg][vo2]sidechaincompress=threshold=0.05:ratio=3:attack=20:release=400[bgd]",
+              "[vo1][bgd]amix=inputs=2:normalize=0:duration=first[a]"]
     out = out or os.path.join(d, f"{c['out_name']}_初稿.mp4")
     subprocess.run([FFMPEG, "-v", "error", "-y", *inputs, "-filter_complex", ";".join(g), "-map", "[v]", "-map", "[a]",
                     "-ss", str(ss), "-t", f"{dur or total / speed - ss:.3f}",
