@@ -40,8 +40,8 @@ def setup(d):
     SRT = os.path.join(D, f"{OUT_NAME}_字幕.srt")
     TXT = os.path.join(D, f"{OUT_NAME}_字幕.txt")
     KEEP = C.get("keep")
-    if KEEP and C.get("drops"):          # 從保留區段再挖掉贅字
-        for d0, d1 in C["drops"]:
+    if KEEP and (C.get("drops") or C.get("repeat_drops")):   # 從保留區段再挖掉贅字、重講
+        for d0, d1 in C.get("drops", []) + C.get("repeat_drops", []):
             KEEP = [p for a, b in KEEP for p in ([[a, b]] if d1 <= a or d0 >= b else
                     [q for q in ([a, d0], [d1, b]) if q[1] - q[0] > 0.04])]
     HL = sorted(C.get("highlights", []), key=len, reverse=True)
@@ -138,6 +138,8 @@ def make():
     cues, txt = [], []
     for s in segs:
         t = clean(s["text"], terms)
+        for ctx, rest in C.get("text_edits", []):        # 剪掉重講後，字幕也拿掉前一次
+            t = re.sub("[，。、 ]*".join(map(re.escape, ctx)), rest, t)
         if C.get("drops"):
             for k in C.get("fillers_kept", []):     # 剪不乾淨而保留的發語詞，字幕也留著
                 t = t.replace(k, "\0" + k[1:])
