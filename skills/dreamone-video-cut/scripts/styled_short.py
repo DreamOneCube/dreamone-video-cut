@@ -30,7 +30,7 @@ W, H, FPS = 1080, 1920, 30
 # 右側約 120px 是愛心／留言／分享按鈕。標題、Logo、字幕、字卡都要放在這個範圍內。
 IG_SAFE = {"top": 250, "bottom": 480, "left": 60, "right": 140}
 SUB_SIZE, EMPH_SIZE = 84, 110
-TITLE_H = 59
+TITLE_H = 118                             # title_png 輸出的高度
 LOGO_W = 96                               # Logo 放在標題列左端當徽章，不和字卡、標題字重疊
 # 磨皮＋氣色：用膚色做遮罩，只在皮膚上做保邊模糊（眉毛、眼睛、頭髮不動），整體微提亮、偏暖紅
 SKIN_MASK = "format=rgba,colorkey=0xC89078:0.20:0.15,alphaextract,format=gray,negate,gblur=sigma=6"
@@ -214,13 +214,22 @@ def burn(d, models, ss, dur, out):
     inputs = ["-i", c["src"], "-i", os.path.join(d, c["audio"]), "-loop", "1", "-t", f"{raw + 5:.0f}", "-i", LOGO]
     g = [f"[0:v]select='{'+'.join(f'between(t,{a},{b})' for a, b in keep)}',setpts=N/FRAME_RATE/TB[b0]"]
     base, F, cards = "b0", 0.2, c.get("cards", [])
+    if c.get("frame"):                   # 非直式素材：自訂濾鏡把畫面排成 1080×1920（例：橫式 → 模糊底＋人像裁切）
+        g[-1] = g[-1][:-4] + "," + c["frame"] + "[b0]"
     if c.get("beauty"):
         g[-1] = g[-1][:-4] + "," + BEAUTY + "[b0]"
-    for k, (png, a, b) in enumerate(c.get("overlays", [])):     # 全畫面 B-roll（1080×1920 透明 png）
+    for k, (png, a, b, *opt) in enumerate(c.get("overlays", [])):
+        # 全畫面 B-roll：1080×1920 透明 png，或 1080×1920 影片（opt：{"ss": 從第幾秒開始}；
+        # 影片照真實速度播放，不跟著整支加速——比賽成績畫面不能被加快）
         S, E = remap(a), remap(b)
         n = inputs.count("-i")
-        inputs += ["-loop", "1", "-framerate", str(FPS), "-t", f"{E - S:.3f}", "-i", os.path.join(d, png)]
-        g += [f"[{n}:v]format=rgba,setpts=PTS-STARTPTS+{S}/TB,fade=in:st={S}:d=0.25:alpha=1,"
+        if png.lower().endswith((".mp4", ".mov")):
+            inputs += ["-ss", str((opt[0] if opt else {}).get("ss", 0)), "-t", f"{(E - S) / speed:.3f}", "-i", os.path.join(d, png)]
+            pts = f"(PTS-STARTPTS)*{speed}+{S}/TB"
+        else:
+            inputs += ["-loop", "1", "-framerate", str(FPS), "-t", f"{E - S:.3f}", "-i", os.path.join(d, png)]
+            pts = f"PTS-STARTPTS+{S}/TB"
+        g += [f"[{n}:v]fps={FPS},format=rgba,setpts={pts},fade=in:st={S}:d=0.25:alpha=1,"
               f"fade=out:st={E - 0.25}:d=0.25:alpha=1[ov{k}]",
               f"[{base}][ov{k}]overlay=0:0:eof_action=pass[ob{k}]"]
         base = f"ob{k}"
