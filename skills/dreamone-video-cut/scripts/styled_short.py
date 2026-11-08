@@ -214,8 +214,6 @@ def burn(d, models, ss, dur, out):
     inputs = ["-i", c["src"], "-i", os.path.join(d, c["audio"]), "-loop", "1", "-t", f"{raw + 5:.0f}", "-i", LOGO]
     g = [f"[0:v]select='{'+'.join(f'between(t,{a},{b})' for a, b in keep)}',setpts=N/FRAME_RATE/TB[b0]"]
     base, F, cards = "b0", 0.2, c.get("cards", [])
-    if c.get("frame"):                   # 非直式素材：自訂濾鏡把畫面排成 1080×1920（例：橫式 → 模糊底＋人像裁切）
-        g[-1] = g[-1][:-4] + "," + c["frame"] + "[b0]"
     if c.get("beauty"):
         g[-1] = g[-1][:-4] + "," + BEAUTY + "[b0]"
     for k, (png, a, b, *opt) in enumerate(c.get("overlays", [])):
