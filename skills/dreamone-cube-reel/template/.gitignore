@@ -1,0 +1,17 @@
+node_modules/
+.hyperframes/
+.media/
+renders/
+snapshots/
+tmp/
+# 以下由 npm run build 產生
+index.html
+compositions/words.html
+compositions/captions.html
+lib/timing.js
+# 聲音（預設不使用；配音與音軌都是產生出來或自備的）
+assets/voice/
+assets/voice-src/
+assets/audio/
+assets/sfx/
+assets/bgm/

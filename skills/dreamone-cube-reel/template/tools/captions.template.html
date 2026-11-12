@@ -1,0 +1,52 @@
+<template>
+  <!-- 由 npm run build 從 tools/captions.template.html 產生；字幕內容請改 lib/script.js -->
+  <style>
+    @font-face {
+      font-family: "jf-openhuninn";
+      src: url("assets/fonts/jf-openhuninn-2.1.ttf") format("truetype");
+    }
+    #root {
+      position: absolute;
+      inset: 0;
+      font-family: "jf-openhuninn", sans-serif;
+      color: #ffffff;
+    }
+    /* 字幕：方塊下方，和方塊之間留約 100px 的空隙；避開右側按鈕與最底部的帳號區 */
+    .w-sub {
+      position: absolute;
+      left: 100px;
+      top: 1312px;
+      width: 840px;
+      height: 180px;
+      text-align: center;
+      overflow: visible;
+    }
+    .w-sub > span {
+      display: block;
+      font-size: 66px;
+      line-height: 87px;
+      text-shadow:
+        0 4px 0 rgba(6, 20, 66, 0.8),
+        0 0 22px rgba(6, 20, 66, 0.7);
+    }
+    .w-sub em {
+      font-style: normal;
+      color: #ffd84a;
+    }
+  </style>
+  <div id="root" data-composition-id="captions" data-width="1080" data-height="1920">
+<!--SUBS-->
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      document.querySelectorAll(".w-sub").forEach((el) => {
+        const s = parseFloat(el.dataset.start), d = parseFloat(el.dataset.duration), span = el.firstElementChild;
+        tl.fromTo(span, { opacity: 0 }, { opacity: 1, duration: 0.08, ease: "power1.out" }, s);
+        tl.to(span, { opacity: 0, duration: 0.08, ease: "power1.in" }, s + d - 0.09);
+      });
+      window.__timelines = window.__timelines || {};
+      window.__timelines["captions"] = tl;
+    })();
+  </script>
+</template>

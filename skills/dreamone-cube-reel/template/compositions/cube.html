@@ -1,0 +1,242 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #cube-x {
+      position: absolute;
+      width: 170px;
+      height: 170px;
+      opacity: 0;
+    }
+    #cube-canvas {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1080px;
+      height: 1920px;
+      display: block;
+    }
+  </style>
+  <div id="root" data-composition-id="cube" data-width="1080" data-height="1920">
+    <canvas id="cube-canvas" class="clip" data-start="0" data-duration="60.4" data-layout-ignore width="1080" height="1920"></canvas>
+    <!-- 「不可能」記號：位置由程式算，落在兩個被交換的邊塊中間 -->
+    <svg id="cube-x" data-layout-ignore viewBox="0 0 170 170" aria-hidden="true">
+      <g fill="none" stroke-linecap="round">
+        <path d="M32 32 L138 138 M138 32 L32 138" stroke="#0a1c58" stroke-width="40" />
+        <path d="M32 32 L138 138 M138 32 L32 138" stroke="#ff5a52" stroke-width="24" />
+      </g>
+    </svg>
+  </div>
+  <script type="module">
+    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.181.2/+esm";
+
+    const E = window.CubeEngine, R = window.ReelData;
+    const W = 1080, H = 1920;
+    const canvas = document.getElementById("cube-canvas");
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(1);
+    renderer.setSize(W, H, false);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(26, W / H, 1, 200);
+    const CAM_DIST = 30;
+    camera.position.set(R.CAM_DIR[0] * CAM_DIST, R.CAM_DIR[1] * CAM_DIST, R.CAM_DIR[2] * CAM_DIST);
+    camera.lookAt(0, 0, 0);
+    camera.setViewOffset(W, H, 0, 45, W, H); // 方塊中心落在畫面約 y=915
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xaebfee, 2.5));
+    const key = new THREE.DirectionalLight(0xfff6e6, 2.0); // 暖色主光，左上前方
+    key.position.set(-7, 14, 9);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    Object.assign(key.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 40 });
+    key.shadow.bias = -0.0004;
+    key.shadow.radius = 5;
+    scene.add(key);
+    const rim = new THREE.DirectionalLight(0xdfeaff, 1.0); // 補光，右前方，讓紅色那面不會太暗
+    rim.position.set(9, 3, 5);
+    scene.add(rim);
+
+    const FLOOR_Y = -1.53;
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.ShadowMaterial({ opacity: 0.3 }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = FLOOR_Y;
+    floor.receiveShadow = true;
+    floor.renderOrder = -2;
+    scene.add(floor);
+
+    // 地板格線：一格就是一個小塊的大小
+    const grid = new THREE.GridHelper(80, 80, 0xffffff, 0xffffff);
+    grid.position.y = FLOOR_Y + 0.002;
+    grid.material.transparent = true;
+    grid.material.opacity = 0.11;
+    grid.material.depthWrite = false;
+    grid.renderOrder = -1;
+    scene.add(grid);
+
+    const stage = new THREE.Group();
+    scene.add(stage);
+
+    // 中心軸：6 個中心塊鎖在這上面
+    const coreMat = new THREE.MeshStandardMaterial({ color: 0x8892a8, roughness: 0.5, metalness: 0.2 });
+    const core = new THREE.Group();
+    core.add(new THREE.Mesh(new THREE.SphereGeometry(0.42, 32, 20), coreMat));
+    const arms = [];
+    for (const ax of ["x", "y", "z"]) {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 1, 20), coreMat);
+      if (ax === "x") arm.rotation.z = Math.PI / 2;
+      if (ax === "z") arm.rotation.x = Math.PI / 2;
+      arm.castShadow = true;
+      arms.push(arm);
+      core.add(arm);
+    }
+    stage.add(core);
+
+    // 小塊：黑色本體＋圓角貼紙
+    const bodyGeo = new THREE.BoxGeometry(0.965, 0.965, 0.965);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x14151b, roughness: 0.55, transparent: true });
+    const s = 0.4, r = 0.11;
+    const shape = new THREE.Shape();
+    shape.moveTo(-s + r, -s);
+    shape.lineTo(s - r, -s);
+    shape.quadraticCurveTo(s, -s, s, -s + r);
+    shape.lineTo(s, s - r);
+    shape.quadraticCurveTo(s, s, s - r, s);
+    shape.lineTo(-s + r, s);
+    shape.quadraticCurveTo(-s, s, -s, s - r);
+    shape.lineTo(-s, -s + r);
+    shape.quadraticCurveTo(-s, -s, -s + r, -s);
+    const stickerGeo = new THREE.ExtrudeGeometry(shape, { depth: 0.02, bevelEnabled: true, bevelSize: 0.012, bevelThickness: 0.012, bevelSegments: 2, curveSegments: 6 });
+    const DIM_TO = new THREE.Color(0x2a3966);
+    const Z = new THREE.Vector3(0, 0, 1);
+
+    const cubies = R.start.map((c) => {
+      const group = new THREE.Group();
+      group.matrixAutoUpdate = false;
+      const body = new THREE.Mesh(bodyGeo, bodyMat.clone());
+      body.castShadow = true;
+      group.add(body);
+      const stickers = [];
+      c.home.forEach((v, i) => {
+        if (!v) return;
+        const n = [0, 0, 0];
+        n[i] = v;
+        const face = Object.keys(E.FACES).find((f) => E.FACES[f].join() === n.join());
+        const base = new THREE.Color(E.COLORS[face]);
+        const mat = new THREE.MeshStandardMaterial({ color: base.clone(), roughness: 0.42, transparent: true });
+        // 壓暗時統一成同一個色相，只保留明暗，避免看起來像別的顏色
+        const lum = 0.2126 * base.r + 0.7152 * base.g + 0.0722 * base.b;
+        const dimmed = DIM_TO.clone().multiplyScalar(0.8 + 0.75 * lum);
+        const mesh = new THREE.Mesh(stickerGeo, mat);
+        const nv = new THREE.Vector3(...n);
+        mesh.quaternion.setFromUnitVectors(Z, nv);
+        mesh.position.copy(nv).multiplyScalar(0.4825);
+        group.add(mesh);
+        stickers.push({ mat, base, dimmed });
+      });
+      stage.add(group);
+      const kind = E.kind(c);
+      return { id: c.id, kind, group, body, stickers, dimKeys: R.dimOverride[c.id] || R.dim[kind], ghostKeys: R.ghost[kind], pops: [], lift: null };
+    });
+    const byId = Object.fromEntries(cubies.map((c) => [c.id, c]));
+
+    // 夢想一號三角形 Logo：印在白色中心塊上（跟實體方塊一樣），會跟著那一層一起轉
+    const logoMat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, opacity: 0 });
+    const logo = new THREE.Mesh(new THREE.PlaneGeometry(0.78, 0.78), logoMat);
+    logo.rotation.x = -Math.PI / 2; // 朝上，圖的上緣朝向後方
+    logo.position.y = 0.4825 + 0.036;
+    logo.renderOrder = 2;
+    byId["0,1,0"].group.add(logo);
+    let logoReady = false;
+    new THREE.TextureLoader().load("assets/logo-triangle.png", (tex) => {
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 8;
+      logoMat.map = tex;
+      logoMat.needsUpdate = true;
+      logoReady = true;
+      renderAt(clock.t);
+    });
+
+    // 純視覺軌道綁到「當時位在該位置的那一塊」
+    const stateAt = (t) => {
+      const cps = R.compiled.checkpoints.filter((c) => c.t <= t);
+      return cps.length ? cps[cps.length - 1].state : R.start;
+    };
+    const idAtSlot = (slot, t) => stateAt(t).find((c) => c.pos.join() === E.slotPos(slot).join()).id;
+    R.pops.forEach((p) => byId[idAtSlot(p.slot, p.t)].pops.push(p.t));
+    R.lifts.forEach((l) => (byId[idAtSlot(l.slot, l.keys[0][0])].lift = l.keys));
+
+    const eases = { out: (f) => 1 - Math.pow(1 - f, 4), inOut: E.easeInOut, undefined: E.easeInOut };
+    function track(keys, t) {
+      if (t <= keys[0][0]) return keys[0][1];
+      for (let i = 1; i < keys.length; i++) {
+        if (t < keys[i][0]) {
+          const [t0, v0] = keys[i - 1], [t1, v1, ease] = keys[i];
+          return v0 + (v1 - v0) * eases[ease]((t - t0) / (t1 - t0));
+        }
+      }
+      return keys[keys.length - 1][1];
+    }
+
+    const m = new THREE.Matrix4(), mR = new THREE.Matrix4(), mT = new THREE.Matrix4(), mA = new THREE.Matrix4(), mS = new THREE.Matrix4();
+    const axis = new THREE.Vector3();
+    function renderAt(t) {
+      const e = track(R.explode, t);
+      const spread = 1 + 0.95 * e;
+      const scale = 1 - 0.36 * e;
+      stage.scale.setScalar(scale);
+      stage.rotation.y = (track(R.yaw, t) * Math.PI) / 180;
+      stage.position.y = FLOOR_Y + 0.03 + (1.5 + 0.95 * e + 0.25 * e) * scale; // 最低的小塊永遠在地板之上
+      arms.forEach((a) => a.scale.set(1, 2 * spread, 1));
+      for (const c of cubies) {
+        const p = E.poseAt(R.compiled, c.id, t);
+        const lift = c.lift ? track(c.lift, t) : 0;
+        const k = spread * (1 + lift);
+        let pop = 1;
+        for (const t0 of c.pops) if (t >= t0 && t < t0 + 0.45) pop += 0.3 * Math.sin((Math.PI * (t - t0)) / 0.45);
+        const q = p.rot;
+        mR.set(q[0][0], q[0][1], q[0][2], 0, q[1][0], q[1][1], q[1][2], 0, q[2][0], q[2][1], q[2][2], 0, 0, 0, 0, 1);
+        mT.makeTranslation(p.pos[0] * k, p.pos[1] * k, p.pos[2] * k);
+        mA.makeRotationAxis(axis.set(p.axis[0], p.axis[1], p.axis[2]), (p.angle * Math.PI) / 180);
+        mS.makeScale(pop, pop, pop);
+        c.group.matrix.copy(m.copy(mA).multiply(mT).multiply(mR).multiply(mS));
+        const d = track(c.dimKeys, t);
+        const gh = track(c.ghostKeys, t), op = 1 - 0.84 * gh;
+        for (const mat of [c.body.material, ...c.stickers.map((st) => st.mat)]) {
+          mat.opacity = op;
+          mat.depthWrite = gh < 0.5;
+        }
+        c.body.castShadow = gh < 0.5;
+        for (const st of c.stickers) st.mat.color.copy(st.base).lerp(st.dimmed, d);
+        if (c.id === "0,1,0") {
+          logoMat.opacity = logoReady ? 1 - 0.55 * d : 0;
+          logoMat.color.setScalar(1 - 0.5 * d);
+        }
+      }
+      renderer.render(scene, camera);
+    }
+
+    const clock = { t: 0 };
+    const tl = gsap.timeline({ paused: true });
+    // ✕ 的位置：爆開狀態下 UF 與 UR 兩個位置的中點，投影到畫面上
+    {
+      const k = (1 + 0.95) * (1 - 0.36), sy = FLOOR_Y + 0.03 + (1.5 + 0.95 + 0.25) * (1 - 0.36);
+      camera.updateMatrixWorld();
+      const p = new THREE.Vector3(0.5 * k, 1 * k + sy, 0.5 * k).project(camera);
+      const x = ((p.x + 1) / 2) * W, y = ((1 - p.y) / 2) * H;
+      const el = document.getElementById("cube-x");
+      el.style.left = Math.round(x - 85) + "px";
+      el.style.top = Math.round(y - 85 - 40) + "px";
+      tl.fromTo(el, { opacity: 0, scale: 2.2 }, { opacity: 1, scale: 1, duration: 0.16, ease: "power4.out" }, R.ev.xIn);
+      tl.to(el, { opacity: 0, scale: 0.8, duration: 0.14, ease: "power2.in" }, R.ev.xOut);
+    }
+    tl.to(clock, { t: R.DURATION, duration: R.DURATION, ease: "none", onUpdate: () => renderAt(clock.t) }, 0);
+    window.__timelines = window.__timelines || {};
+    window.__timelines["cube"] = tl;
+    renderAt(0);
+  </script>
+</template>
