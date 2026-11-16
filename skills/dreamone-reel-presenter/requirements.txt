@@ -1,0 +1,4 @@
+# transcribe.py 與 snap.py 需要。請用 Python 3.10～3.13：
+# 3.14 以上目前沒有 av 的現成輪子，faster-whisper 會裝不起來。
+faster-whisper>=1.2
+numpy>=1.26
