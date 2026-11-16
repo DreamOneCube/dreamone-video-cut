@@ -15,3 +15,11 @@
 - [聲音的現況與接手方式](skills/dreamone-cube-reel/references/sound.md)（還沒定案）
 - [安裝與檔案說明](skills/dreamone-cube-reel/README.md)
 - [驗證記錄](docs/reports/2026-11-13-dreamone-cube-reel.md)
+
+## 方塊動畫＋真人講解
+
+- [dreamone-reel-presenter](skills/dreamone-reel-presenter/SKILL.md)：動畫做好之後，把講師的自拍講解合進去——從 NG 裡挑取樣、剪接點對到安靜處、旁白加快、動畫時間軸回頭配合人聲、右下角人像圓框與名牌、無版權配樂與響度。
+- [片單](docs/videos.md)：每支影片的編號與狀態。溝通一律講編號。
+- [踩過的坑](skills/dreamone-reel-presenter/references/lessons.md)
+- [安裝與檔案說明](skills/dreamone-reel-presenter/README.md)
+- [驗證記錄](docs/reports/2026-11-17-dreamone-reel-presenter.md)
