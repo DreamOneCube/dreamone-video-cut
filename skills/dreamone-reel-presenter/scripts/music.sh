@@ -7,7 +7,7 @@
 # 可用環境變數調整：
 #   BED=13       音樂比人聲小幾 dB（越大越小聲。團隊規範是「約 10 dB」，
 #                這裡保守一點用 13，嫌音樂太小聲就調成 10）
-#   VOICE=-16    人聲校到多少 LUFS
+#   VOICE=-15    人聲校到多少 LUFS（-16 的話墊了配樂成品會掉到 -16.2，低於標準）
 #   SKIP=0       音樂從第幾秒開始用（前奏太長時跳過）
 #   FADEIN=0.4   音樂淡入秒數
 #   FADEOUT=1.5  音樂淡出秒數
@@ -35,7 +35,7 @@ for f in "$VIDEO" "$MUSIC"; do
 done
 
 BED=${BED:-13}
-VOICE=${VOICE:-16}; VOICE=${VOICE#-}   # 寫 16 或 -16 都可以
+VOICE=${VOICE:-15}; VOICE=${VOICE#-}   # 寫 16 或 -16 都可以
 SKIP=${SKIP:-0}
 FADEIN=${FADEIN:-0.4}
 FADEOUT=${FADEOUT:-1.5}
