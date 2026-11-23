@@ -66,3 +66,24 @@ def tag(font_path, out, text):
     d.text((w / 2, h / 2), text, font=f, fill=(14, 17, 22, 255), anchor="mm")
     im.resize((w // S, h // S), Image.LANCZOS).save(out)
     return w // S, h // S
+
+
+def panel_card(src, box, out, width=980, pad=18, radius=36):
+    """從資訊圖（例：課程介紹圖）裁出一塊，放大到 width，加同色圓角底與陰影，當影片裡的卡片。
+    box=(左, 上, 右, 下)，像素座標；底色取原圖左上角。"""
+    from PIL import ImageFilter
+    im = Image.open(src).convert("RGBA")
+    bg = im.getpixel((5, 5))
+    c = im.crop(box)
+    c = c.resize((width, int(c.height * width / c.width)), Image.LANCZOS)
+    w, h = c.width + 2 * pad, c.height + 2 * pad
+    card = Image.new("RGBA", (w + 40, h + 40), (0, 0, 0, 0))
+    sh = Image.new("RGBA", card.size, (0, 0, 0, 0))
+    ImageDraw.Draw(sh).rounded_rectangle([20, 28, 20 + w, 28 + h], radius, fill=(0, 0, 0, 120))
+    card.alpha_composite(sh.filter(ImageFilter.GaussianBlur(12)))
+    face = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    ImageDraw.Draw(face).rounded_rectangle([0, 0, w - 1, h - 1], radius, fill=bg)
+    face.alpha_composite(c, (pad, pad))
+    card.alpha_composite(face, (20, 20))
+    card.save(out)
+    return card.size
