@@ -15,10 +15,10 @@
 
 | 本機檔名 | 曲名 | 作者 | 調性 | 長度 | 用在 |
 |---|---|---|---|---|---|
-| `01_curious.mp3` | [Curious Background Music](https://pixabay.com/music/comedy-curious-background-music-634638/) | Sonican | 好奇、俏皮 | 1:05 | |
+| `01_curious.mp3` | [Curious Background Music](https://pixabay.com/music/comedy-curious-background-music-634638/) | Sonican | 好奇、俏皮 | 1:05 | **04** |
 | `02_mysterious.mp3` | [Mysterious Fog Curious Discovery](https://pixabay.com/music/electronic-mysterious-fog-curious-discovery-575877/) | alex-morgan | 神祕、探索 | 1:30 | **02** |
 | `03_classroom.mp3` | [Education Classroom Learning Flow](https://pixabay.com/music/happy-childrens-tunes-education-classroom-learning-flow-578471/) | alex-morgan | 教室、輕快 | 1:04 | **01** |
-| `04_sunlight.mp3` | [Sunlight](https://pixabay.com/music/house-sunlight-633626/) | SoSimpleAudio | 明亮、律動 | 2:12 | |
+| `04_sunlight.mp3` | [Sunlight](https://pixabay.com/music/house-sunlight-633626/) | SoSimpleAudio | 明亮、律動 | 2:12 | **03** |
 
 ## 混音的設定
 
